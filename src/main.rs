@@ -51,7 +51,7 @@ async fn handle_connection(client_stream: Result<TcpStream, tokio::io::Error>) -
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
 	let args = std::env::args().collect::<Vec<_>>();
-	let path = args.get(0)
+	let path = args.get(1)
 		.ok_or(StringError(String::from("Please specify path of the agent socket.")))?;
 	let listener = TcpListener::bind(path.parse::<SocketAddr>()?).await?;
 	listener.incoming().for_each_concurrent(Some(4), |stream| async {
