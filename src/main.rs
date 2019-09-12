@@ -9,7 +9,12 @@ use std::time::Duration;
 use tokio::prelude::*;
 use tokio::future::FutureExt;
 use tokio::io::{AsyncRead, AsyncWrite};
-use tokio::net::{TcpListener, TcpStream};
+use tokio::net::TcpListener;
+
+#[cfg(unix)]
+type ClientStream = tokio::net::UnixStream;
+#[cfg(not(unix))]
+type ClientStream = tokio::net::TcpStream;
 
 #[derive(Debug)]
 struct StringError(String);
@@ -28,7 +33,7 @@ async fn do_copy<T1: AsyncRead + Unpin, T2: AsyncWrite + Unpin>(rx: &mut T1, tx:
 	Ok(())
 }
 
-async fn handle_connection(client_stream: Result<TcpStream, tokio::io::Error>) -> Result<(), Box<dyn Error>> {
+async fn handle_connection(client_stream: Result<ClientStream, tokio::io::Error>) -> Result<(), Box<dyn Error>> {
 	let (mut crx, mut ctx) = client_stream?.split();
 	let addr = "127.0.0.1:0".parse::<SocketAddr>()?;
 	let app_listener = TcpListener::bind(&addr).await?;
@@ -53,7 +58,13 @@ async fn main() -> Result<(), Box<dyn Error>> {
 	let args = std::env::args().collect::<Vec<_>>();
 	let path = args.get(1)
 		.ok_or(StringError(String::from("Please specify path of the agent socket.")))?;
+
+	#[cfg(unix)]
+	let listener = tokio::net::UnixListener::bind(&path)?;
+
+	#[cfg(not(unix))]
 	let listener = TcpListener::bind(path.parse::<SocketAddr>()?).await?;
+
 	listener.incoming().for_each_concurrent(Some(4), |stream| async {
 		if let Err(e) = handle_connection(stream).await {
 			eprintln!("Error: {:?}", e);
