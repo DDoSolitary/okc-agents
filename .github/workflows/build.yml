@@ -8,4 +8,8 @@ jobs:
           rustup toolchain install nightly
           rustup default nightly
           rustup target add aarch64-linux-android
-          ./build-termux.sh --release
+          ./build-termux.sh
+      - uses: actions/upload-artifact@master
+        with:
+          name: Binary
+          path: target/aarch64-linux-android/debug/okc-ssh-agent
