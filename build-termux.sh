@@ -1,3 +1,5 @@
+#!/bin/bash
+
 if [[ -z $ANDROID_SDK_ROOT ]]; then
 	echo Android SDK not found!
 	exit
