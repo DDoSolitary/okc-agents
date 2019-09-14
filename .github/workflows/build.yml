@@ -9,6 +9,6 @@ jobs:
           rustup default nightly
           rustup target add aarch64-linux-android
           ./build-termux.sh
-          tar czf release.tar.gz -C target/aarch64-linux-android/debug okc-ssh-agent
-          curl -fsS -T release.tar.gz -u ddosolitary:${{ secrets.BINTRAY_KEY }} https://api.bintray.com/content/ddosolitary/dev-releases/default/default/okc-ssh-agent/okc-ssh-agent-r$(git rev-list --count HEAD).tar.gz
+          tar czf release.tar.gz -C target/aarch64-linux-android/debug okc-ssh-agent okc-gpg
+          curl -fsS -T release.tar.gz -u ddosolitary:${{ secrets.BINTRAY_KEY }} https://api.bintray.com/content/ddosolitary/dev-releases/default/default/okc-agents/okc-agents-r$(git rev-list --count HEAD).tar.gz
           curl -fsS -X POST -u ddosolitary:${{ secrets.BINTRAY_KEY }} https://api.bintray.com/content/ddosolitary/dev-releases/default/default/publish

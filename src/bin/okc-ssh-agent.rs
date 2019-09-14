@@ -1,18 +1,24 @@
 extern crate tokio;
 extern crate okc_agents;
 
-use std::error::Error;
 use std::net::SocketAddr;
 use std::process::Command;
 use std::time::Duration;
 use tokio::prelude::*;
 use tokio::net::TcpListener;
+use tokio::io::{AsyncRead, AsyncWrite};
 use okc_agents::utils::*;
 
 #[cfg(unix)]
 type ClientStream = tokio::net::UnixStream;
 #[cfg(not(unix))]
 type ClientStream = tokio::net::TcpStream;
+
+async fn do_copy<T1: AsyncRead + Unpin, T2: AsyncWrite + Unpin>(rx: &mut T1, tx: &mut T2) -> Result {
+	rx.copy(tx).await?;
+	tx.shutdown().await?;
+	Ok(())
+}
 
 async fn handle_connection(client_stream: std::result::Result<ClientStream, tokio::io::Error>) -> Result {
 	let (mut crx, mut ctx) = client_stream?.split();
