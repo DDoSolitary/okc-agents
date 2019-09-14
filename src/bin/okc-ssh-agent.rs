@@ -21,7 +21,6 @@ async fn handle_connection(client_stream: Result<ClientStream, tokio::io::Error>
 	let addr = app_listener.local_addr()?;
 	Command::new("am").arg("broadcast")
 		.arg("-n").arg("org.ddosolitary.okcagent/.SshProxyReceiver")
-		.arg("-a").arg("org.ddosolitary.okcagent.action.RUN_SSH_AGENT")
 		.arg("--ei").arg("org.ddosolitary.okcagent.extra.SSH_PROXY_PORT").arg(addr.port().to_string())
 		.status()?;
 	let (mut arx, mut atx) = app_listener.incoming().take(1).collect::<Vec<_>>()
