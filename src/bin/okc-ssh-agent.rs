@@ -1,37 +1,18 @@
 extern crate tokio;
-extern crate futures_util;
+extern crate okc_agents;
 
 use std::error::Error;
-use std::fmt::{Display, Formatter};
 use std::net::SocketAddr;
 use std::process::Command;
 use std::time::Duration;
 use tokio::prelude::*;
-use tokio::future::FutureExt;
-use tokio::io::{AsyncRead, AsyncWrite};
 use tokio::net::TcpListener;
+use okc_agents::utils::*;
 
 #[cfg(unix)]
 type ClientStream = tokio::net::UnixStream;
 #[cfg(not(unix))]
 type ClientStream = tokio::net::TcpStream;
-
-#[derive(Debug)]
-struct StringError(String);
-
-impl Display for StringError {
-	fn fmt(&self, f: &mut Formatter) -> Result<(), std::fmt::Error> {
-		self.0.fmt(f)
-	}
-}
-
-impl Error for StringError {}
-
-async fn do_copy<T1: AsyncRead + Unpin, T2: AsyncWrite + Unpin>(rx: &mut T1, tx: &mut T2) -> Result<(), Box<dyn Error>> {
-	rx.copy(tx).await?;
-	tx.shutdown().await?;
-	Ok(())
-}
 
 async fn handle_connection(client_stream: Result<ClientStream, tokio::io::Error>) -> Result<(), Box<dyn Error>> {
 	let (mut crx, mut ctx) = client_stream?.split();
@@ -61,7 +42,6 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
 	#[cfg(unix)]
 	let listener = tokio::net::UnixListener::bind(&path)?;
-
 	#[cfg(not(unix))]
 	let listener = TcpListener::bind(path.parse::<SocketAddr>()?).await?;
 

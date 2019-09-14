@@ -261,7 +261,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "okc-ssh-agent"
+name = "okc-agents"
 version = "0.1.0"
 dependencies = [
  "futures-util-preview 0.3.0-alpha.18 (registry+https://github.com/rust-lang/crates.io-index)",
