@@ -14,7 +14,7 @@ type ClientStream = tokio::net::UnixStream;
 #[cfg(not(unix))]
 type ClientStream = tokio::net::TcpStream;
 
-async fn handle_connection(client_stream: Result<ClientStream, tokio::io::Error>) -> Result<(), Box<dyn Error>> {
+async fn handle_connection(client_stream: std::result::Result<ClientStream, tokio::io::Error>) -> Result {
 	let (mut crx, mut ctx) = client_stream?.split();
 	let addr = "127.0.0.1:0".parse::<SocketAddr>()?;
 	let app_listener = TcpListener::bind(&addr).await?;
@@ -34,7 +34,7 @@ async fn handle_connection(client_stream: Result<ClientStream, tokio::io::Error>
 }
 
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn Error>> {
+async fn main() -> Result {
 	let args = std::env::args().collect::<Vec<_>>();
 	let path = args.get(1)
 		.ok_or(StringError(String::from("Please specify path of the agent socket.")))?;
