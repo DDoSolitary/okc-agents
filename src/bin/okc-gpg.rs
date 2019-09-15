@@ -25,9 +25,11 @@ async fn read_str<T: AsyncRead + Unpin>(rx: &mut T) -> std::result::Result<Strin
 }
 
 async fn handle_control_connection(mut stream: TcpStream) -> Result {
-	let mut stderr = tokio::io::stderr();
-	stream.copy(&mut stderr).await?;
-	Ok(())
+	let msg = read_str(&mut stream).await?;
+	match msg.is_empty() {
+		true => Ok(()),
+		false => Err(Box::new(StringError(msg)) as Box<dyn Error>)
+	}
 }
 
 async fn handle_input_connection(mut stream: TcpStream) -> Result {
