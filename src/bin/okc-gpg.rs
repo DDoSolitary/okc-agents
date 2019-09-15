@@ -76,7 +76,7 @@ async fn main() -> Result {
 	let addr = listener.local_addr()?;
 	Command::new("am")
 		.arg("-n").arg("org.ddosolitary.okcagent/.GpgProxyReceiver")
-		.arg("--ei").arg("org.ddosolitary.okcagent.extra.GPG_PROXY_PORT").arg(addr.port().to_string())
+		.arg("--ei").arg("org.ddosolitary.okcagent.extra.PROXY_PORT").arg(addr.port().to_string())
 		.arg("--esa").arg("org.ddosolitary.okcagent.extra.GPG_ARGS")
 		.arg(std::env::args().skip(1).map(|s| base64::encode(&s)).collect::<Vec<_>>().join(","))
 		.status()?;

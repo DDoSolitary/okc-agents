@@ -28,7 +28,7 @@ async fn handle_connection(client_stream: std::result::Result<ClientStream, toki
 	let addr = app_listener.local_addr()?;
 	Command::new("am").arg("broadcast")
 		.arg("-n").arg("org.ddosolitary.okcagent/.SshProxyReceiver")
-		.arg("--ei").arg("org.ddosolitary.okcagent.extra.SSH_PROXY_PORT").arg(addr.port().to_string())
+		.arg("--ei").arg("org.ddosolitary.okcagent.extra.PROXY_PORT").arg(addr.port().to_string())
 		.status()?;
 	let (mut arx, mut atx) = app_listener.incoming().take(1).collect::<Vec<_>>()
 		.timeout(Duration::from_secs(10)).await
