@@ -55,5 +55,9 @@ async fn main() -> Result {
 			eprintln!("Error: {:?}", e);
 		}
 	}).await;
+
+	#[cfg(unix)]
+	tokio::fs::remove_file(path).await?;
+
 	Ok(())
 }
