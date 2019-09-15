@@ -1,3 +1,4 @@
+extern crate ctrlc;
 extern crate tokio;
 extern crate okc_agents;
 
@@ -50,6 +51,17 @@ async fn main() -> Result {
 	#[cfg(not(unix))]
 	let listener = TcpListener::bind(path.parse::<SocketAddr>()?).await?;
 
+	#[cfg(unix)] {
+		let path = path.clone();
+		ctrlc::set_handler(move || {
+			if let Err(e) = std::fs::remove_file(&path) {
+				eprintln!("Error: {:?}", e);
+				std::process::exit(1);
+			}
+			std::process::exit(0);
+		}).unwrap();
+	}
+
 	listener.incoming().for_each_concurrent(Some(4), |stream| async {
 		if let Err(e) = handle_connection(stream).await {
 			eprintln!("Error: {:?}", e);
@@ -57,7 +69,7 @@ async fn main() -> Result {
 	}).await;
 
 	#[cfg(unix)]
-	tokio::fs::remove_file(path).await?;
+	std::fs::remove_file(&path)?;
 
 	Ok(())
 }
