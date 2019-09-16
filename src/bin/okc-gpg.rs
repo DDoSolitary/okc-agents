@@ -25,10 +25,18 @@ async fn read_str<T: AsyncRead + Unpin>(rx: &mut T) -> std::result::Result<Strin
 }
 
 async fn handle_control_connection(mut stream: TcpStream) -> Result {
-	let msg = read_str(&mut stream).await?;
-	match msg.is_empty() {
-		true => Ok(()),
-		false => Err(Box::new(StringError(msg)) as Box<dyn Error>)
+	loop {
+		let msg = read_str(&mut stream).await?;
+		match msg.is_empty() {
+			true => break,
+			false => eprintln!("{}", msg)
+		}
+	}
+	let mut stat_buf = [0u8; 1];
+	stream.read_exact(&mut stat_buf).await?;
+	match stat_buf[0] {
+		0 => Ok(()),
+		_ => Err(Box::new(StringError(String::from("An error has occurred."))) as Box<dyn Error>)
 	}
 }
 
