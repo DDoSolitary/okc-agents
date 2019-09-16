@@ -4,7 +4,7 @@ extern crate okc_agents;
 
 use std::error::Error;
 use std::net::SocketAddr;
-use std::process::Command;
+use std::process::{Command, Stdio};
 use tokio::prelude::*;
 use tokio::fs::File;
 use tokio::net::{TcpListener, TcpStream};
@@ -81,6 +81,7 @@ async fn main() -> Result {
 		.arg("--ei").arg("org.ddosolitary.okcagent.extra.PROXY_PORT").arg(addr.port().to_string())
 		.arg("--esa").arg("org.ddosolitary.okcagent.extra.GPG_ARGS")
 		.arg(std::env::args().skip(1).map(|s| base64::encode(&s)).collect::<Vec<_>>().join(","))
+		.stdout(Stdio::null()).stderr(Stdio::null())
 		.status()?;
 	listener.incoming().for_each_concurrent(None, |stream| async {
 		if let Err(e) = handle_connection(stream).await {

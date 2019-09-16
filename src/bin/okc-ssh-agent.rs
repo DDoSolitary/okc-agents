@@ -3,7 +3,7 @@ extern crate tokio;
 extern crate okc_agents;
 
 use std::net::SocketAddr;
-use std::process::Command;
+use std::process::{Command, Stdio};
 use std::time::Duration;
 use tokio::prelude::*;
 use tokio::net::TcpListener;
@@ -29,6 +29,7 @@ async fn handle_connection(client_stream: std::result::Result<ClientStream, toki
 	Command::new("am").arg("broadcast")
 		.arg("-n").arg("org.ddosolitary.okcagent/.SshProxyReceiver")
 		.arg("--ei").arg("org.ddosolitary.okcagent.extra.PROXY_PORT").arg(addr.port().to_string())
+		.stdout(Stdio::null()).stderr(Stdio::null())
 		.status()?;
 	let (mut arx, mut atx) = app_listener.incoming().take(1).collect::<Vec<_>>()
 		.timeout(Duration::from_secs(10)).await
