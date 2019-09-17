@@ -42,7 +42,7 @@ async fn handle_control_connection(mut stream: TcpStream) -> Result {
 
 async fn handle_input_connection(mut stream: TcpStream) -> Result {
 	let path = read_str(&mut stream).await?;
-	if path.is_empty() {
+	if path == "-" {
 		let mut stdin = tokio::io::stdin();
 		stdin.copy(&mut stream).await?;
 	} else {
@@ -54,7 +54,7 @@ async fn handle_input_connection(mut stream: TcpStream) -> Result {
 
 async fn handle_output_connection(mut stream: TcpStream) -> Result {
 	let path = read_str(&mut stream).await?;
-	if path.is_empty() {
+	if path == "-" {
 		let mut stdout = tokio::io::stdout();
 		stream.copy(&mut stdout).await?;
 	} else {
