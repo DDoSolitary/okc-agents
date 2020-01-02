@@ -7,7 +7,9 @@ use std::net::SocketAddr;
 use std::process::{Command, Stdio};
 use tokio::prelude::*;
 use tokio::fs::File;
+use tokio::io;
 use tokio::net::{TcpListener, TcpStream};
+use tokio::stream::StreamExt;
 use okc_agents::utils::*;
 
 fn exit_error(e: Box<dyn Error>) -> ! {
@@ -43,11 +45,11 @@ async fn handle_control_connection(mut stream: TcpStream) -> Result {
 async fn handle_input_connection(mut stream: TcpStream) -> Result {
 	let path = read_str(&mut stream).await?;
 	if path == "-" {
-		let mut stdin = tokio::io::stdin();
-		stdin.copy(&mut stream).await?;
+		let mut stdin = io::stdin();
+		io::copy(&mut stdin, &mut stream).await?;
 	} else {
 		let mut file = File::open(&path).await?;
-		file.copy(&mut stream).await?;
+		io::copy(&mut file, &mut stream).await?;
 	}
 	Ok(())
 }
@@ -55,17 +57,17 @@ async fn handle_input_connection(mut stream: TcpStream) -> Result {
 async fn handle_output_connection(mut stream: TcpStream) -> Result {
 	let path = read_str(&mut stream).await?;
 	if path == "-" {
-		let mut stdout = tokio::io::stdout();
-		stream.copy(&mut stdout).await?;
+		let mut stdout = io::stdout();
+		io::copy(&mut stream, &mut stdout).await?;
 	} else {
 		let mut file = File::create(&path).await?;
-		stream.copy(&mut file).await?;
+		io::copy(&mut stream, &mut file).await?;
 	}
 	Ok(())
 }
 
-async fn handle_connection(stream: std::result::Result<TcpStream, tokio::io::Error>) -> Result {
-	let mut stream = stream?;
+async fn handle_connection(accept_result: std::result::Result<TcpStream, tokio::io::Error>) -> Result {
+	let mut stream = accept_result?;
 	let mut op = [0u8];
 	stream.read_exact(&mut op).await?;
 	match op[0] {
@@ -82,7 +84,7 @@ async fn handle_connection(stream: std::result::Result<TcpStream, tokio::io::Err
 #[tokio::main]
 async fn main() -> Result {
 	let addr = "127.0.0.1:0".parse::<SocketAddr>()?;
-	let listener = TcpListener::bind(&addr).await?;
+	let mut listener = TcpListener::bind(&addr).await?;
 	let addr = listener.local_addr()?;
 	Command::new("am").arg("broadcast")
 		.arg("-n").arg("org.ddosolitary.okcagent/.GpgProxyReceiver")
@@ -91,10 +93,11 @@ async fn main() -> Result {
 		.arg(std::env::args().skip(1).map(|s| base64::encode(&s)).collect::<Vec<_>>().join(","))
 		.stdout(Stdio::null()).stderr(Stdio::null())
 		.status()?;
-	listener.incoming().for_each_concurrent(None, |stream| async {
-		if let Err(e) = handle_connection(stream).await {
+	let mut incoming = listener.incoming();
+	while let Some(accept_result) = incoming.next().await {
+		if let Err(e) = handle_connection(accept_result).await {
 			exit_error(e)
 		}
-	}).await;
+	};
 	Ok(())
 }

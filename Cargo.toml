@@ -5,7 +5,7 @@ authors = ["DDoSolitary <DDoSolitary@gmail.com>"]
 edition = "2018"
 
 [dependencies]
-tokio = "0.2.0-alpha.4"
-futures-util-preview = "0.3.0-alpha.18"
-base64 = "0.10.1"
+tokio = { version = "0.2.6", features = ["fs", "io-std", "io-util", "macros", "stream", "tcp", "time", "uds"] }
+futures-util = "0.3.1"
+base64 = "0.11.0"
 ctrlc = "3.1.3"
