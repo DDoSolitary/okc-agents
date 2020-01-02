@@ -5,8 +5,7 @@ jobs:
     steps:
       - uses: actions/checkout@master
       - run: |
-          rustup toolchain install nightly
-          rustup default nightly
+          rustup update
           rustup target add aarch64-linux-android
           ./build-termux.sh
           tar czf release.tar.gz -C target/aarch64-linux-android/debug okc-ssh-agent okc-gpg
