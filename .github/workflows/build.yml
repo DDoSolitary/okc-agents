@@ -1,13 +1,19 @@
 on: push
 jobs:
   build:
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [x86_64-linux-android, i686-linux-android, aarch64-linux-android, armv7-linux-androideabi]
     runs-on: ubuntu-18.04
     steps:
       - uses: actions/checkout@master
-      - run: |
+      - env:
+          TARGET: ${{ matrix.target }}
+        run: |
           rustup update
-          rustup target add aarch64-linux-android
+          rustup target add $TARGET
           ./build-termux.sh
-          tar czf release.tar.gz -C target/aarch64-linux-android/debug okc-ssh-agent okc-gpg
-          curl -fsS -T release.tar.gz -u ddosolitary:${{ secrets.BINTRAY_KEY }} https://api.bintray.com/content/ddosolitary/dev-releases/default/default/okc-agents/okc-agents-r$(git rev-list --count HEAD).tar.gz
+          tar czf release.tar.gz -C target/$TARGET/debug okc-ssh-agent okc-gpg
+          curl -fsS -T release.tar.gz -u ddosolitary:${{ secrets.BINTRAY_KEY }} https://api.bintray.com/content/ddosolitary/dev-releases/default/default/okc-agents/okc-agents-r$(git rev-list --count HEAD)-$(echo $TARGET | cut -d - -f 1).tar.gz
           curl -fsS -X POST -u ddosolitary:${{ secrets.BINTRAY_KEY }} https://api.bintray.com/content/ddosolitary/dev-releases/default/default/publish
