@@ -146,6 +146,9 @@ async fn run(logger: Logger) -> Result {
 
 #[tokio::main]
 async fn main() {
+	if std::env::var("RUST_LOG").map(|s| s.is_empty()).unwrap_or(true) {
+		std::env::set_var("RUST_LOG", "warn");
+	}
 	let drain = FullFormat::new(TermDecorator::new().stderr().build()).build().ignore_res();
 	let drain = slog_envlogger::new(drain).ignore_res();
 	let (drain, guard) = Async::new(drain).build_with_guard();
