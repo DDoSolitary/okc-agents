@@ -86,13 +86,16 @@ async fn main() -> Result {
 	let addr = "127.0.0.1:0".parse::<SocketAddr>()?;
 	let mut listener = TcpListener::bind(&addr).await?;
 	let addr = listener.local_addr()?;
-	Command::new("am").arg("broadcast")
+	let mut cmd = Command::new("am");
+	cmd.arg("broadcast")
 		.arg("-n").arg("org.ddosolitary.okcagent/.GpgProxyReceiver")
 		.arg("--ei").arg("org.ddosolitary.okcagent.extra.PROXY_PORT").arg(addr.port().to_string())
-		.arg("--esa").arg("org.ddosolitary.okcagent.extra.GPG_ARGS")
-		.arg(std::env::args().skip(1).map(|s| base64::encode(&s)).collect::<Vec<_>>().join(","))
-		.stdout(Stdio::null()).stderr(Stdio::null())
-		.status()?;
+		.stdout(Stdio::null()).stderr(Stdio::null());
+	if std::env::args().len() > 1 {
+		cmd.arg("--esa").arg("org.ddosolitary.okcagent.extra.GPG_ARGS")
+			.arg(std::env::args().skip(1).map(|s| base64::encode(&s)).collect::<Vec<_>>().join(","));
+	}
+	cmd.status()?;
 	let mut incoming = listener.incoming();
 	while let Some(accept_result) = incoming.next().await {
 		if let Err(e) = handle_connection(accept_result).await {
