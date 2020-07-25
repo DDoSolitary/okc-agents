@@ -49,9 +49,12 @@ async fn handle_control_connection(mut stream: TcpStream, logger: Logger) -> Res
 	loop {
 		let msg = read_str(&mut stream).await?;
 		debug!(logger, "new warning message received"; "length" => msg.len());
-		match msg.is_empty() {
-			true => break,
-			false => warn!(logger, "{}", msg)
+		if msg.is_empty() {
+			break;
+		} else if msg.starts_with("[GNUPG:]") {
+			eprintln!("{}", msg);
+		} else {
+			warn!(logger, "{}", msg);
 		}
 	}
 	debug!(logger, "all warnings processed, waiting for status code");
