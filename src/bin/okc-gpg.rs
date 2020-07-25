@@ -51,13 +51,16 @@ async fn handle_control_connection(mut stream: TcpStream, logger: Logger) -> Res
 		debug!(logger, "new warning message received"; "length" => msg.len());
 		if msg.is_empty() {
 			break;
-		} else if msg.starts_with("[GNUPG:]") {
-			eprintln!("{}", msg);
+		}
+		if msg.starts_with("[E] ") {
+			error!(logger, "{}", &msg[4..]);
+		} else if msg.starts_with("[W] ") {
+			warn!(logger, "{}", &msg[4..]);
 		} else {
-			warn!(logger, "{}", msg);
+			eprintln!("{}", msg);
 		}
 	}
-	debug!(logger, "all warnings processed, waiting for status code");
+	debug!(logger, "all messages processed, waiting for status code");
 	let mut stat_buf = [0u8; 1];
 	stream.read_exact(&mut stat_buf).await?;
 	info!(logger, "control connection finished"; "status_code" => stat_buf[0]);
