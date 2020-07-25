@@ -13,6 +13,7 @@ use std::error::Error;
 use std::net::SocketAddr;
 use std::process::{Command, Stdio};
 use std::sync::Mutex;
+use futures_util::StreamExt;
 use slog::{Logger, Drain};
 use slog_async::{Async, AsyncGuard};
 use slog_term::{FullFormat, TermDecorator};
@@ -20,7 +21,6 @@ use tokio::prelude::*;
 use tokio::fs::File;
 use tokio::io;
 use tokio::net::{TcpListener, TcpStream};
-use tokio::stream::StreamExt;
 use okc_agents::utils::*;
 
 lazy_static! {
@@ -132,13 +132,12 @@ async fn run(logger: Logger) -> Result {
 	}
 	cmd.status()?;
 	info!(logger, "broadcast sent, waiting for app to connect");
-	let mut incoming = listener.incoming();
-	while let Some(accept_result) = incoming.next().await {
+	listener.incoming().for_each_concurrent(Some(3), |accept_result| async {
 		debug!(logger, "new incoming connection");
 		if let Err(e) = handle_connection(accept_result, logger.clone()).await {
-			exit_error(e, logger)
+			exit_error(e, logger.clone())
 		}
-	};
+	}).await;
 	Ok(())
 }
 

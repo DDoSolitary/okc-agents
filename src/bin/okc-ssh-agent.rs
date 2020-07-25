@@ -14,6 +14,7 @@ use std::process::{Command, Stdio};
 use std::sync::Mutex;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Duration;
+use futures_util::StreamExt;
 use slog::{Logger, Drain};
 use slog_async::{Async, AsyncGuard};
 use slog_term::{FullFormat, TermDecorator};
@@ -21,7 +22,6 @@ use futures_util::future;
 use tokio::prelude::*;
 use tokio::net::TcpListener;
 use tokio::io::{self, AsyncRead, AsyncWrite};
-use tokio::stream::StreamExt;
 use tokio::time;
 use okc_agents::utils::*;
 
@@ -95,13 +95,12 @@ async fn run(logger: Logger) -> Result {
 		}).unwrap();
 	}
 
-	let mut incoming = listener.incoming();
-	while let Some(accept_result) = incoming.next().await {
+	listener.incoming().for_each_concurrent(Some(4), |accept_result| async {
 		debug!(logger, "new incoming connection");
 		if let Err(e) = handle_connection(accept_result, logger.clone()).await {
 			error!(logger, "failed to accept the connection: {:?}", e);
 		}
-	}
+	}).await;
 	#[cfg(unix)] std::fs::remove_file(&path)?;
 
 	Ok(())
