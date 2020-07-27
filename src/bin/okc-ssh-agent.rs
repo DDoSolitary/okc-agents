@@ -1,7 +1,5 @@
 extern crate ctrlc;
 #[macro_use]
-extern crate lazy_static;
-#[macro_use]
 extern crate slog;
 extern crate slog_async;
 extern crate slog_envlogger;
@@ -11,12 +9,11 @@ extern crate okc_agents;
 
 use std::net::SocketAddr;
 use std::process::{Command, Stdio};
-use std::sync::Mutex;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Duration;
 use futures_util::StreamExt;
 use slog::{Logger, Drain};
-use slog_async::{Async, AsyncGuard};
+use slog_async::Async;
 use slog_term::{FullFormat, TermDecorator};
 use futures_util::future;
 use tokio::prelude::*;
@@ -30,18 +27,6 @@ type ClientStream = tokio::net::UnixStream;
 #[cfg(not(unix))]
 type ClientStream = tokio::net::TcpStream;
 
-lazy_static! {
-	static ref LOG_GUARD: Mutex<Option<AsyncGuard>> = Mutex::new(None);
-	static ref CONN_COUNTER: AtomicU64 = AtomicU64::new(0);
-}
-
-fn exit_process(code: i32) -> ! {
-	if let Some(guard) = LOG_GUARD.lock().unwrap().take() {
-		std::mem::drop(guard);
-	}
-	std::process::exit(code)
-}
-
 async fn do_copy<T1: AsyncRead + Unpin, T2: AsyncWrite + Unpin>(rx: &mut T1, tx: &mut T2) -> Result {
 	io::copy(rx, tx).await?;
 	tx.shutdown().await?;
@@ -50,7 +35,6 @@ async fn do_copy<T1: AsyncRead + Unpin, T2: AsyncWrite + Unpin>(rx: &mut T1, tx:
 
 async fn handle_connection(accept_result: std::result::Result<ClientStream, io::Error>, logger: Logger) -> Result {
 	let mut client_stream = accept_result?;
-	let logger = logger.new(o!("id" => CONN_COUNTER.fetch_add(1, Ordering::Relaxed)));
 	info!(logger, "connected to client");
 	let (mut crx, mut ctx) = client_stream.split();
 	let addr = "127.0.0.1:0".parse::<SocketAddr>()?;
@@ -95,7 +79,9 @@ async fn run(logger: Logger) -> Result {
 		}).unwrap();
 	}
 
+	let counter = AtomicU64::new(0);
 	listener.incoming().for_each_concurrent(Some(4), |accept_result| async {
+		let logger = logger.new(o!("id" => counter.fetch_add(1, Ordering::Relaxed)));
 		debug!(logger, "new incoming connection");
 		if let Err(e) = handle_connection(accept_result, logger.clone()).await {
 			error!(logger, "failed to accept the connection: {:?}", e);

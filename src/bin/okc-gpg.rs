@@ -1,7 +1,5 @@
 extern crate base64;
 #[macro_use]
-extern crate lazy_static;
-#[macro_use]
 extern crate slog;
 extern crate slog_async;
 extern crate slog_envlogger;
@@ -12,28 +10,15 @@ extern crate okc_agents;
 use std::error::Error;
 use std::net::SocketAddr;
 use std::process::{Command, Stdio};
-use std::sync::Mutex;
 use futures_util::StreamExt;
 use slog::{Logger, Drain};
-use slog_async::{Async, AsyncGuard};
+use slog_async::Async;
 use slog_term::{FullFormat, TermDecorator};
 use tokio::prelude::*;
 use tokio::fs::File;
 use tokio::io;
 use tokio::net::{TcpListener, TcpStream};
 use okc_agents::utils::*;
-
-lazy_static! {
-	static ref LOG_GUARD: Mutex<Option<AsyncGuard>> = Mutex::new(None);
-}
-
-fn exit_error(e: Box<dyn Error>, logger: Logger) -> ! {
-	error!(logger, "{:?}", e);
-	if let Some(guard) = LOG_GUARD.lock().unwrap().take() {
-		std::mem::drop(guard);
-	}
-	std::process::exit(1)
-}
 
 async fn read_str<T: AsyncRead + Unpin>(rx: &mut T) -> std::result::Result<String, Box<dyn Error>> {
 	let mut len_buf = [0u8; 2];
@@ -109,15 +94,22 @@ async fn handle_connection(accept_result: std::result::Result<TcpStream, tokio::
 	let mut op = [0u8];
 	stream.read_exact(&mut op).await?;
 	debug!(logger, "connection type is {}", op[0]);
-	match op[0] {
-		0 => match handle_control_connection(stream, logger).await {
-			Ok(_) => std::process::exit(0),
-			Err(e) => Err(e)
+	let res = match op[0] {
+		0 => match handle_control_connection(stream, logger.clone()).await {
+			Ok(_) => exit_process(0),
+			Err(e) => {
+				error!(logger, "{:?}", e);
+				exit_process(1);
+			}
 		},
-		1 => handle_input_connection(stream, logger).await,
-		2 => handle_output_connection(stream, logger).await,
+		1 => handle_input_connection(stream, logger.clone()).await,
+		2 => handle_output_connection(stream, logger.clone()).await,
 		_ => Err(Box::new(StringError(String::from("protocol error: invalid connection type"))) as Box<dyn Error>)
+	};
+	if let Err(e) = res {
+		error!(logger, "{:?}", e);
 	}
+	Ok(())
 }
 
 async fn run(logger: Logger) -> Result {
@@ -141,7 +133,8 @@ async fn run(logger: Logger) -> Result {
 	listener.incoming().for_each_concurrent(Some(3), |accept_result| async {
 		debug!(logger, "new incoming connection");
 		if let Err(e) = handle_connection(accept_result, logger.clone()).await {
-			exit_error(e, logger.clone())
+			error!(logger, "{:?}", e);
+			exit_process(1);
 		}
 	}).await;
 	Ok(())
@@ -158,6 +151,7 @@ async fn main() {
 	*LOG_GUARD.lock().unwrap() = Some(guard);
 	let logger = Logger::root(drain.ignore_res(), o!());
 	if let Err(e) = run(logger.clone()).await {
-		exit_error(e, logger);
+		error!(logger, "{:?}", e);
+		exit_process(1);
 	}
 }
