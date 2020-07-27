@@ -1,9 +1,6 @@
 extern crate ctrlc;
 #[macro_use]
 extern crate slog;
-extern crate slog_async;
-extern crate slog_envlogger;
-extern crate slog_term;
 extern crate tokio;
 extern crate okc_agents;
 
@@ -12,9 +9,7 @@ use std::process::{Command, Stdio};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Duration;
 use futures_util::StreamExt;
-use slog::{Logger, Drain};
-use slog_async::Async;
-use slog_term::{FullFormat, TermDecorator};
+use slog::Logger;
 use futures_util::future;
 use tokio::prelude::*;
 use tokio::net::TcpListener;
@@ -94,16 +89,5 @@ async fn run(logger: Logger) -> Result {
 
 #[tokio::main]
 async fn main() {
-	if std::env::var("RUST_LOG").map(|s| s.is_empty()).unwrap_or(true) {
-		std::env::set_var("RUST_LOG", "warn");
-	}
-	let drain = FullFormat::new(TermDecorator::new().stderr().build()).build().ignore_res();
-	let drain = slog_envlogger::new(drain).ignore_res();
-	let (drain, guard) = Async::new(drain).build_with_guard();
-	*LOG_GUARD.lock().unwrap() = Some(guard);
-	let logger = Logger::root(drain.ignore_res(), o!());
-	if let Err(e) = run(logger.clone()).await {
-		error!(logger, "{:?}", e);
-		exit_process(1);
-	}
+	lib_main(run).await;
 }
