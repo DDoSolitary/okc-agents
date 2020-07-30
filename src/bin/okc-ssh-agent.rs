@@ -17,6 +17,8 @@ use tokio::io::{self, AsyncRead, AsyncWrite};
 use tokio::time;
 use okc_agents::utils::*;
 
+const PROTO_VER: i32 = 0;
+
 #[cfg(unix)]
 type ClientStream = tokio::net::UnixStream;
 #[cfg(not(unix))]
@@ -38,6 +40,7 @@ async fn handle_connection(accept_result: std::result::Result<ClientStream, io::
 	info!(logger, "listening on port {}", addr.port());
 	Command::new("am").arg("broadcast")
 		.arg("-n").arg("org.ddosolitary.okcagent/.SshProxyReceiver")
+		.arg("--ei").arg("org.ddosolitary.okcagent.extra.SSH_PROTO_VER").arg(PROTO_VER.to_string())
 		.arg("--ei").arg("org.ddosolitary.okcagent.extra.PROXY_PORT").arg(addr.port().to_string())
 		.stdout(Stdio::null()).stderr(Stdio::null())
 		.status()?;

@@ -15,6 +15,8 @@ use tokio::io;
 use tokio::net::{TcpListener, TcpStream};
 use okc_agents::utils::*;
 
+const PROTO_VER: i32 = 0;
+
 async fn read_str<T: AsyncRead + Unpin>(rx: &mut T) -> std::result::Result<String, Box<dyn Error>> {
 	let mut len_buf = [0u8; 2];
 	rx.read_exact(&mut len_buf).await?;
@@ -115,6 +117,7 @@ async fn run(logger: Logger) -> Result {
 	let mut cmd = Command::new("am");
 	cmd.arg("broadcast")
 		.arg("-n").arg("org.ddosolitary.okcagent/.GpgProxyReceiver")
+		.arg("--ei").arg("org.ddosolitary.okcagent.extra.GPG_PROTO_VER").arg(PROTO_VER.to_string())
 		.arg("--ei").arg("org.ddosolitary.okcagent.extra.PROXY_PORT").arg(addr.port().to_string())
 		.stdout(Stdio::null()).stderr(Stdio::null());
 	if std::env::args().len() > 1 {
