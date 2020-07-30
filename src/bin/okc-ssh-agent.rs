@@ -46,7 +46,7 @@ async fn handle_connection(accept_result: std::result::Result<ClientStream, io::
 		.status()?;
 	info!(logger, "broadcast sent, waiting for app to connect");
 	let mut app_stream = time::timeout(Duration::from_secs(10), app_listener.incoming().next()).await
-		.map_err(|_| StringError(String::from("timed out waiting for app to connect")))?.unwrap()?;
+		.map_err(|_| StringError::new("timed out waiting for app to connect"))?.unwrap()?;
 	info!(logger, "app connected, start forwarding"; "remote_port" => app_stream.peer_addr()?.port());
 	let (mut arx, mut atx) = app_stream.split();
 	let (r1, r2) = future::join(do_copy(&mut crx, &mut atx), do_copy(&mut arx, &mut ctx)).await;
@@ -59,7 +59,7 @@ async fn handle_connection(accept_result: std::result::Result<ClientStream, io::
 async fn run(logger: Logger) -> Result {
 	let args = std::env::args().collect::<Vec<_>>();
 	let path = args.get(1)
-		.ok_or(StringError(String::from("please specify path of the agent socket")))?;
+		.ok_or(StringError::new("please specify path of the agent socket"))?;
 
 	#[cfg(unix)] let mut listener = tokio::net::UnixListener::bind(&path)?;
 	#[cfg(not(unix))] let mut listener = TcpListener::bind(path.parse::<SocketAddr>()?).await?;

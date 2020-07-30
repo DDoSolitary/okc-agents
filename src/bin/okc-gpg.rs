@@ -45,7 +45,7 @@ async fn handle_control_connection(mut stream: TcpStream, logger: Logger) -> Res
 	info!(logger, "control connection finished"; "status_code" => stat);
 	match stat {
 		0 => Ok(()),
-		_ => Err(Box::new(StringError(String::from("an error has occurred in the app"))) as Box<dyn Error>)
+		_ => Err(Box::new(StringError::new("an error has occurred in the app")) as Box<dyn Error>)
 	}
 }
 
@@ -97,7 +97,7 @@ async fn handle_connection(accept_result: std::result::Result<TcpStream, tokio::
 		},
 		1 => handle_input_connection(stream, logger.clone()).await,
 		2 => handle_output_connection(stream, logger.clone()).await,
-		_ => Err(Box::new(StringError(String::from("protocol error: invalid connection type"))) as Box<dyn Error>)
+		_ => Err(Box::new(StringError::new("protocol error: invalid connection type")) as Box<dyn Error>)
 	};
 	if let Err(e) = res {
 		error!(logger, "{:?}", e);

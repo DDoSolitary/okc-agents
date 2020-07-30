@@ -29,6 +29,12 @@ pub mod utils {
 
 	impl Error for StringError {}
 
+	impl StringError {
+		pub fn new(s: impl AsRef<str>) -> Self {
+			Self(s.as_ref().to_owned())
+		}
+	}
+
 
 	lazy_static! {
 		pub static ref LOG_GUARD: Mutex<Option<AsyncGuard>> = Mutex::new(None);
