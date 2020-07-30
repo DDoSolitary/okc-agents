@@ -18,10 +18,8 @@ use okc_agents::utils::*;
 const PROTO_VER: i32 = 0;
 
 async fn read_str<T: AsyncRead + Unpin>(rx: &mut T) -> std::result::Result<String, Box<dyn Error>> {
-	let mut len_buf = [0u8; 2];
-	rx.read_exact(&mut len_buf).await?;
-	let len = ((len_buf[0] as usize) << 8) + len_buf[1] as usize;
-	let mut str_buf = vec!(0u8; len);
+	let len = rx.read_u16().await?;
+	let mut str_buf = vec!(0u8; len as usize);
 	rx.read_exact(&mut str_buf).await?;
 	Ok(String::from_utf8(str_buf)?)
 }
@@ -43,10 +41,9 @@ async fn handle_control_connection(mut stream: TcpStream, logger: Logger) -> Res
 		}
 	}
 	debug!(logger, "all messages processed, waiting for status code");
-	let mut stat_buf = [0u8; 1];
-	stream.read_exact(&mut stat_buf).await?;
-	info!(logger, "control connection finished"; "status_code" => stat_buf[0]);
-	match stat_buf[0] {
+	let stat = stream.read_u8().await?;
+	info!(logger, "control connection finished"; "status_code" => stat);
+	match stat {
 		0 => Ok(()),
 		_ => Err(Box::new(StringError(String::from("an error has occurred in the app"))) as Box<dyn Error>)
 	}
@@ -88,10 +85,9 @@ async fn handle_connection(accept_result: std::result::Result<TcpStream, tokio::
 	let mut stream = accept_result?;
 	let logger = logger.new(o!("remote_port" => stream.peer_addr()?.port()));
 	debug!(logger, "connection accepted");
-	let mut op = [0u8];
-	stream.read_exact(&mut op).await?;
-	debug!(logger, "connection type is {}", op[0]);
-	let res = match op[0] {
+	let op = stream.read_u8().await?;
+	debug!(logger, "connection type is {}", op);
+	let res = match op {
 		0 => match handle_control_connection(stream, logger.clone()).await {
 			Ok(_) => exit_process(0),
 			Err(e) => {
