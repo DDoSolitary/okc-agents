@@ -15,13 +15,39 @@ use tokio::io;
 use tokio::net::{TcpListener, TcpStream};
 use okc_agents::utils::*;
 
-const PROTO_VER: i32 = 0;
+const PROTO_VER: i32 = 1;
 
 async fn read_str<T: AsyncRead + Unpin>(rx: &mut T) -> std::result::Result<String, Box<dyn Error>> {
 	let len = rx.read_u16().await?;
 	let mut str_buf = vec!(0u8; len as usize);
 	rx.read_exact(&mut str_buf).await?;
 	Ok(String::from_utf8(str_buf)?)
+}
+
+async fn copy_input(rx: &mut (impl AsyncRead + Unpin), tx: &mut (impl AsyncWrite + Unpin), logger: &Logger) -> Result {
+	let mut buf = vec![0u8; u16::max_value() as usize];
+	loop {
+		let len = rx.read(&mut buf).await?;
+		debug!(logger, "sending {} bytes", len);
+		if len == 0 { break }
+		tx.write_u16(len as u16).await?;
+		tx.write_all(&buf[..len]).await?;
+	}
+	tx.write_u16(0).await?;
+	Ok(())
+}
+
+async fn copy_output(rx: &mut (impl AsyncRead + Unpin), tx: &mut (impl AsyncWrite + Unpin), logger: &Logger) -> Result {
+	let mut buf = vec![0u8; u16::max_value() as usize];
+	loop {
+		let len = rx.read_u16().await? as usize;
+		debug!(logger, "{} bytes received", len);
+		if len == 0 {
+			return Ok(())
+		}
+		rx.read_exact(&mut buf[..len]).await?;
+		tx.write_all(&buf[..len]).await?;
+	}
 }
 
 async fn handle_control_connection(mut stream: TcpStream, logger: Logger) -> Result {
@@ -55,11 +81,11 @@ async fn handle_input_connection(mut stream: TcpStream, logger: Logger) -> Resul
 	if &path == "-" {
 		let mut stdin = io::stdin();
 		debug!(logger, "reading from stdin");
-		io::copy(&mut stdin, &mut stream).await?;
+		copy_input(&mut stdin, &mut stream, &logger).await?;
 	} else {
 		let mut file = File::open(&path).await?;
 		debug!(logger, "reading from file");
-		io::copy(&mut file, &mut stream).await?;
+		copy_input(&mut file, &mut stream, &logger).await?;
 	}
 	info!(logger, "input connection finished");
 	Ok(())
@@ -71,11 +97,11 @@ async fn handle_output_connection(mut stream: TcpStream, logger: Logger) -> Resu
 	if &path == "-" {
 		let mut stdout = io::stdout();
 		debug!(logger, "writing to stdout");
-		io::copy(&mut stream, &mut stdout).await?;
+		copy_output(&mut stream, &mut stdout, &logger).await?;
 	} else {
 		let mut file = File::create(&path).await?;
 		debug!(logger, "writing to file");
-		io::copy(&mut stream, &mut file).await?;
+		copy_output(&mut stream, &mut file, &logger).await?;
 	}
 	info!(logger, "output connection finished");
 	Ok(())
