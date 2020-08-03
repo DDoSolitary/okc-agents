@@ -29,7 +29,7 @@ async fn copy_input(rx: &mut (impl AsyncRead + Unpin), tx: &mut (impl AsyncWrite
 	loop {
 		let len = rx.read(&mut buf).await?;
 		debug!(logger, "sending {} bytes", len);
-		if len == 0 { break }
+		if len == 0 { break; }
 		tx.write_u16(len as u16).await?;
 		tx.write_all(&buf[..len]).await?;
 	}
@@ -43,7 +43,7 @@ async fn copy_output(rx: &mut (impl AsyncRead + Unpin), tx: &mut (impl AsyncWrit
 		let len = rx.read_u16().await? as usize;
 		debug!(logger, "{} bytes received", len);
 		if len == 0 {
-			return Ok(())
+			return Ok(());
 		}
 		rx.read_exact(&mut buf[..len]).await?;
 		tx.write_all(&buf[..len]).await?;
@@ -132,6 +132,8 @@ async fn handle_connection(accept_result: std::result::Result<TcpStream, tokio::
 }
 
 async fn run(logger: Logger) -> Result {
+	info!(logger, "okc-gpg"; "version" => env!("CARGO_PKG_VERSION"), "protocol_version" => PROTO_VER);
+
 	let addr = "127.0.0.1:0".parse::<SocketAddr>()?;
 	let mut listener = TcpListener::bind(&addr).await?;
 	let addr = listener.local_addr()?;

@@ -57,6 +57,8 @@ async fn handle_connection(accept_result: std::result::Result<ClientStream, io::
 }
 
 async fn run(logger: Logger) -> Result {
+	info!(logger, "okc-ssh-agent"; "version" => env!("CARGO_PKG_VERSION"), "protocol_version" => PROTO_VER);
+
 	let args = std::env::args().collect::<Vec<_>>();
 	let path = args.get(1)
 		.ok_or(StringError::new("please specify path of the agent socket"))?;
