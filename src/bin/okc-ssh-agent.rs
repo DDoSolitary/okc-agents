@@ -12,17 +12,12 @@ use futures_util::StreamExt;
 use slog::Logger;
 use futures_util::future;
 use tokio::prelude::*;
-use tokio::net::TcpListener;
+use tokio::net::{TcpListener, UnixListener, UnixStream};
 use tokio::io::{self, AsyncRead, AsyncWrite};
 use tokio::time;
 use okc_agents::utils::*;
 
 const PROTO_VER: i32 = 0;
-
-#[cfg(unix)]
-type ClientStream = tokio::net::UnixStream;
-#[cfg(not(unix))]
-type ClientStream = tokio::net::TcpStream;
 
 async fn do_copy<T1: AsyncRead + Unpin, T2: AsyncWrite + Unpin>(rx: &mut T1, tx: &mut T2) -> Result {
 	io::copy(rx, tx).await?;
@@ -30,7 +25,7 @@ async fn do_copy<T1: AsyncRead + Unpin, T2: AsyncWrite + Unpin>(rx: &mut T1, tx:
 	Ok(())
 }
 
-async fn handle_connection(accept_result: std::result::Result<ClientStream, io::Error>, logger: Logger) -> Result {
+async fn handle_connection(accept_result: std::result::Result<UnixStream, io::Error>, logger: Logger) -> Result {
 	let mut client_stream = accept_result?;
 	info!(logger, "connected to client");
 	let (mut crx, mut ctx) = client_stream.split();
@@ -63,21 +58,18 @@ async fn run(logger: Logger) -> Result {
 	let path = args.get(1)
 		.ok_or(StringError::new("please specify path of the agent socket"))?;
 
-	#[cfg(unix)] let mut listener = tokio::net::UnixListener::bind(&path)?;
-	#[cfg(not(unix))] let mut listener = TcpListener::bind(path.parse::<SocketAddr>()?).await?;
+	let mut listener = UnixListener::bind(&path)?;
 	info!(logger, "listening on the Unix socket: \"{}\"", path);
 
-	#[cfg(unix)] {
-		let path = path.clone();
-		let logger = logger.clone();
-		ctrlc::set_handler(move || {
-			if let Err(e) = std::fs::remove_file(&path) {
-				error!(logger, "failed to delete the socket file: {:?}", e);
-				exit_process(1);
-			}
-			exit_process(0);
-		}).unwrap();
-	}
+	let path = path.clone();
+	let logger = logger.clone();
+	ctrlc::set_handler(move || {
+		if let Err(e) = std::fs::remove_file(&path) {
+			error!(logger, "failed to delete the socket file: {:?}", e);
+			exit_process(1);
+		}
+		exit_process(0);
+	}).unwrap();
 
 	let counter = AtomicU64::new(0);
 	listener.incoming().for_each_concurrent(Some(4), |accept_result| async {
@@ -87,7 +79,7 @@ async fn run(logger: Logger) -> Result {
 			error!(logger, "failed to accept the connection: {:?}", e);
 		}
 	}).await;
-	#[cfg(unix)] std::fs::remove_file(&path)?;
+	std::fs::remove_file(&path)?;
 
 	Ok(())
 }
