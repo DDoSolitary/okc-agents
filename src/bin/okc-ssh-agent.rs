@@ -1,19 +1,23 @@
-extern crate ctrlc;
+#[macro_use]
+extern crate lazy_static;
 #[macro_use]
 extern crate slog;
 extern crate tokio;
 extern crate okc_agents;
 
+use std::fs;
 use std::net::SocketAddr;
 use std::process::{Command, Stdio};
+use std::sync::RwLock;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Duration;
 use futures_util::StreamExt;
-use slog::Logger;
 use futures_util::future;
+use slog::Logger;
 use tokio::prelude::*;
-use tokio::net::{TcpListener, UnixListener, UnixStream};
 use tokio::io::{self, AsyncRead, AsyncWrite};
+use tokio::net::{TcpListener, UnixListener, UnixStream};
+use tokio::signal::unix::{Signal, SignalKind, signal};
 use tokio::time;
 use okc_agents::utils::*;
 
@@ -51,25 +55,21 @@ async fn handle_connection(accept_result: std::result::Result<UnixStream, io::Er
 	Ok(())
 }
 
+lazy_static! {
+	pub static ref SOCKET_FILE: RwLock<Option<String>> = RwLock::new(None);
+	pub static ref SOCKET_DIR: RwLock<Option<String>> = RwLock::new(None);
+}
+
 async fn run(logger: Logger) -> Result {
 	info!(logger, "okc-ssh-agent"; "version" => env!("CARGO_PKG_VERSION"), "protocol_version" => PROTO_VER);
 
 	let args = std::env::args().collect::<Vec<_>>();
 	let path = args.get(1)
 		.ok_or(StringError::new("please specify path of the agent socket"))?;
+	*SOCKET_FILE.write().unwrap() = Some(path.clone());
 
 	let mut listener = UnixListener::bind(&path)?;
 	info!(logger, "listening on the Unix socket: \"{}\"", path);
-
-	let path = path.clone();
-	let logger = logger.clone();
-	ctrlc::set_handler(move || {
-		if let Err(e) = std::fs::remove_file(&path) {
-			error!(logger, "failed to delete the socket file: {:?}", e);
-			exit_process(1);
-		}
-		exit_process(0);
-	}).unwrap();
 
 	let counter = AtomicU64::new(0);
 	listener.incoming().for_each_concurrent(Some(4), |accept_result| async {
@@ -79,12 +79,41 @@ async fn run(logger: Logger) -> Result {
 			error!(logger, "failed to accept the connection: {:?}", e);
 		}
 	}).await;
-	std::fs::remove_file(&path)?;
 
 	Ok(())
 }
 
+fn cleanup(logger: Logger) {
+	if let Some(ref socket_file) = *SOCKET_FILE.read().unwrap() {
+		fs::remove_file(socket_file).unwrap_or_else(|e| {
+			warn!(logger, "failed to delete the socket file: {:?}", e; "path" => socket_file);
+		});
+	}
+	if let Some(ref socket_dir) = *SOCKET_DIR.read().unwrap() {
+		fs::remove_dir(socket_dir).unwrap_or_else(|e| {
+			warn!(logger, "failed to delete the temporary directory: {:?}", e; "path" => socket_dir);
+		});
+	}
+}
+
+async fn handle_signals(mut signal: Signal, logger: Logger) {
+	signal.recv().await;
+	cleanup(logger);
+	exit_process(1);
+}
+
+async fn run_with_cleanup(logger: Logger) -> Result {
+	tokio::spawn(future::join3(
+		handle_signals(signal(SignalKind::hangup())?, logger.clone()),
+		handle_signals(signal(SignalKind::interrupt())?, logger.clone()),
+		handle_signals(signal(SignalKind::terminate())?, logger.clone()),
+	));
+	let res = run(logger.clone()).await;
+	cleanup(logger.clone());
+	res
+}
+
 #[tokio::main]
 async fn main() {
-	lib_main(run).await;
+	lib_main(run_with_cleanup).await;
 }
