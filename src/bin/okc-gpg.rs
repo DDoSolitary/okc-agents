@@ -162,7 +162,6 @@ async fn run(logger: Logger) -> Result {
 	Ok(())
 }
 
-#[tokio::main]
-async fn main() {
-	lib_main(run).await;
+fn main() {
+	lib_main(run);
 }

@@ -47,6 +47,7 @@ pub mod utils {
 		std::process::exit(code)
 	}
 
+	#[tokio::main]
 	pub async fn lib_main<T>(run: impl FnOnce(Logger) -> T) where T: Future<Output = Result> {
 		if std::env::var("RUST_LOG").map(|s| s.is_empty()).unwrap_or(true) {
 			std::env::set_var("RUST_LOG", "warn");
