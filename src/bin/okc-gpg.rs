@@ -2,6 +2,7 @@ extern crate base64;
 #[macro_use]
 extern crate slog;
 extern crate tokio;
+extern crate tokio_stream;
 extern crate okc_agents;
 
 use std::error::Error;
@@ -9,10 +10,10 @@ use std::net::SocketAddr;
 use std::process::{Command, Stdio};
 use futures_util::StreamExt;
 use slog::Logger;
-use tokio::prelude::*;
 use tokio::fs::File;
-use tokio::io;
+use tokio::io::{self, AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
+use tokio_stream::wrappers::TcpListenerStream;
 use okc_agents::utils::*;
 
 const PROTO_VER: i32 = 1;
@@ -135,7 +136,7 @@ async fn run(logger: Logger) -> Result {
 	info!(logger, "okc-gpg"; "version" => env!("CARGO_PKG_VERSION"), "protocol_version" => PROTO_VER);
 
 	let addr = "127.0.0.1:0".parse::<SocketAddr>()?;
-	let mut listener = TcpListener::bind(&addr).await?;
+	let listener = TcpListener::bind(&addr).await?;
 	let addr = listener.local_addr()?;
 	info!(logger, "listening on port {}", addr.port());
 	let mut cmd = Command::new("am");
@@ -152,7 +153,7 @@ async fn run(logger: Logger) -> Result {
 	}
 	cmd.status()?;
 	info!(logger, "broadcast sent, waiting for app to connect");
-	listener.incoming().for_each_concurrent(Some(3), |accept_result| async {
+	TcpListenerStream::new(listener).for_each_concurrent(Some(3), |accept_result| async {
 		debug!(logger, "new incoming connection");
 		if let Err(e) = handle_connection(accept_result, logger.clone()).await {
 			error!(logger, "{:?}", e);

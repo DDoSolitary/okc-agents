@@ -5,6 +5,7 @@ extern crate libc;
 #[macro_use]
 extern crate slog;
 extern crate tokio;
+extern crate tokio_stream;
 extern crate okc_agents;
 
 use std::ffi::{CString, OsStr, OsString};
@@ -19,12 +20,12 @@ use std::time::Duration;
 use futures_util::{StreamExt, TryFutureExt};
 use futures_util::future;
 use slog::Logger;
-use tokio::prelude::*;
-use tokio::io::{self, AsyncRead, AsyncWrite};
+use tokio::io::{self, AsyncRead, AsyncWrite, AsyncWriteExt};
 use tokio::net::{TcpListener, UnixListener, UnixStream};
 use tokio::process::Command;
 use tokio::signal::unix::{Signal, SignalKind, signal};
 use tokio::time;
+use tokio_stream::wrappers::{TcpListenerStream, UnixListenerStream};
 use okc_agents::utils::*;
 
 type StdUnixListener = std::os::unix::net::UnixListener;
@@ -47,7 +48,7 @@ async fn handle_connection(accept_result: std::result::Result<UnixStream, io::Er
 	info!(logger, "connected to client");
 	let (mut crx, mut ctx) = client_stream.split();
 	let addr = "127.0.0.1:0".parse::<SocketAddr>()?;
-	let mut app_listener = TcpListener::bind(&addr).await?;
+	let app_listener = TcpListener::bind(&addr).await?;
 	let addr = app_listener.local_addr()?;
 	info!(logger, "listening on port {}", addr.port());
 	Command::new("am").arg("broadcast")
@@ -57,7 +58,7 @@ async fn handle_connection(accept_result: std::result::Result<UnixStream, io::Er
 		.stdout(Stdio::null()).stderr(Stdio::null())
 		.status().await?;
 	info!(logger, "broadcast sent, waiting for app to connect");
-	let mut app_stream = time::timeout(Duration::from_secs(10), app_listener.incoming().next()).await
+	let mut app_stream = time::timeout(Duration::from_secs(10), TcpListenerStream::new(app_listener).next()).await
 		.map_err(|_| StringError::new("timed out waiting for app to connect"))?.unwrap()?;
 	info!(logger, "app connected, start forwarding"; "remote_port" => app_stream.peer_addr()?.port());
 	let (mut arx, mut atx) = app_stream.split();
@@ -76,10 +77,10 @@ lazy_static! {
 async fn run(listener: StdUnixListener, logger: Logger) -> Result {
 	info!(logger, "okc-ssh-agent"; "version" => env!("CARGO_PKG_VERSION"), "protocol_version" => PROTO_VER);
 
-	let mut listener = UnixListener::from_std(listener)?;
+	let listener = UnixListener::from_std(listener)?;
 
 	let counter = AtomicU64::new(0);
-	listener.incoming().for_each_concurrent(Some(4), |accept_result| async {
+	UnixListenerStream::new(listener).for_each_concurrent(Some(4), |accept_result| async {
 		let logger = logger.new(o!("id" => counter.fetch_add(1, Ordering::Relaxed)));
 		debug!(logger, "new incoming connection");
 		if let Err(e) = handle_connection(accept_result, logger.clone()).await {
