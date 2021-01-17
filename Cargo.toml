@@ -14,7 +14,7 @@ slog = "2.5.2"
 slog-async = "2.5.0"
 slog-envlogger = "2.2.0"
 slog-term = "2.6.0"
-tokio = { version = "0.2.23", features = ["fs", "io-std", "io-util", "macros", "process", "signal", "stream", "tcp", "time", "uds"] }
+tokio = { version = "0.2.24", features = ["fs", "io-std", "io-util", "macros", "process", "signal", "stream", "tcp", "time", "uds"] }
 
 [profile.release]
 lto = true
